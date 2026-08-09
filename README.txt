@@ -1,14 +1,19 @@
-muc - tiny markup language (h1)
-===============================
+muc
+===
 
-muc is a tiny markup language. this is a program to convert that markup language to html, written in c :)
+muc is a program that converts a minimal markup language (outlined in this file) to HTML. It can be used both as a library and as a CLI program.
 
-muc has a very small amount of features, all of which are used in this README file.
+examples
+--------
 
-links and images (h2)
----------------------
+To display an image, you can use:
+<kbd.png> 
 
-<cat.net> = put a link
-<pickle.org|put a hyperlink>
-<cat.png> = put an image
-<cat.png|put an image with href; alt text is unsupported>
+To display an image with a href, you can use:
+<kbd.png|https://www.4gamer.net/games/044/G004481/20080522050/> 
+
+You can use links and hyperlinks in a similar and readable way;
+<https://topre.club>
+
+And a hyperlink:
+<https://topre.club|Topre community>
