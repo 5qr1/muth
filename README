@@ -1,0 +1,7 @@
+muth: markup to html
+====================
+
+muth is a tiny (186 sloc!) markup to html converter written in C
+muth supports only setext style headings and a <custom.link|format> which works for <images.jpg> too! it does not concern itself with commonmark or compatibility with other formats
+
+licensed under WTFPL :- )

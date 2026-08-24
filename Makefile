@@ -1,17 +1,20 @@
-.PHONY: all install uninstall clean
 .POSIX:
+.PHONY: all install uninstall clean
+
+VERSION = 0.1
+
 CC = cc
-CFLAGS = -Wall
+CFLAGS = -Wall -Wextra -DVERSION=\"$(VERSION)\"
 LDLIBS = -lm
 
-all: muc
-install: muc
-	cp -f muc $(DESTDIR)$(PREFIX)/bin
+all: muth
+install: muth
+	cp -f muth $(DESTDIR)/$(PREFIX)/bin
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/muc
+	rm -f $(DESTDIR)/$(PREFIX)/bin/muth
 
-muc: muc.c muc.h
+muth: muth.c
 
 clean:
-	rm -f muc
+	rm -f muth muth.core muth.o a.out
