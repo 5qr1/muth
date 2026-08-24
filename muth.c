@@ -91,7 +91,7 @@ static char
 		return NULL;
 
 	fseek(in, 0, SEEK_END);
-	int bufsiz = ftell(in);
+	long bufsiz = ftell(in);
 	char *buf = emalloc(NULL, bufsiz + 3);
 	fseek(in, 0, SEEK_SET);
 	
@@ -190,14 +190,19 @@ links(char **ret, char *st, char *en) {
 	for(size_t i = 0; i < LENGTH(fmts) && !img; i++)
 		img = strstr(buf, fmts[i]);
 	
-	if(h)
-		*ret = apsprintf(*ret, "<a href=\"%s\">", h);
-	else
+	if(h) {
+		*ret = apsprintf(*ret, "<a href=\"");
+		process(ret, h, &h[strlen(h)]);
+		*ret = apsprintf(*ret, "\">");
+	} else
 		*ret = apsprintf(*ret, "<a>");
+	if(img) 
+		*ret = apsprintf(*ret, "<img src=\"");
+	process(ret, buf, &buf[strlen(buf)]);
 	if(img)
-		*ret = apsprintf(*ret, "<img src=\"%s\"></a>", buf);
+		*ret = apsprintf(*ret, "\"></a>");
 	else
-		*ret = apsprintf(*ret, "%s</a>", buf);
+		*ret = apsprintf(*ret, "</a>");
 
 	free(buf);
 	return (p - st) + 1;
