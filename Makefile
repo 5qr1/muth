@@ -1,7 +1,7 @@
 .POSIX:
 .PHONY: all install uninstall clean
 
-VERSION = 0.2
+VERSION = 0.3
 
 CC = cc
 CFLAGS = -Wall -Wextra -DVERSION=\"$(VERSION)\"

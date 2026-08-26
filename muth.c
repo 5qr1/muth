@@ -23,13 +23,13 @@ char *fmts[] = {".jpg", ".jpeg", ".png", ".webp", ".gif"};
 
 int
 main(int argc, char **argv) {
-	FILE *s = stdin;
-	if(argc > 1) {
-		if(argv[1][1] == 'v')
-			eprint(0, "%s\n", VERSION);
-		if(!(s = fopen(argv[1], "r")))
-			eprint(EXIT_FAILURE, "bad input\n");
-	}
+	FILE *s;
+	if(argc < 2)
+		eprint(0, "muth [file]\n");
+	if(!(strcmp(argv[1], "-v")))
+		eprint(0, "muth v%s\n", VERSION);
+	if(!(s = fopen(argv[1], "r")))
+		eprint(EXIT_FAILURE, "bad file\n");
 	
 	char *buf = filetobuf(s), *html = emalloc(NULL, 1024);
 	html[0] = '\0';
@@ -98,18 +98,18 @@ static char
 	buf[0] = '\n';
 	size_t len = fread(buf + 1, 1, bufsiz, in);
 	buf[len + 1] = '\0';
-	strcat(buf, "\n");
 	return buf;
 }
 
 static char
 *process(char **ret, char *st, char *en) {
+	if(!(st) || !(en))
+		return 0;
 	if(!(*ret))
 		*ret = emalloc(NULL, 1024);
 	
-	int ch;
 	for(char *p = st; p < en; p++) {
-		ch = 0;
+		int ch = 0;
 		for(size_t i = 0; i < LENGTH(parsers) && !ch; i++)
 			ch = parsers[i](ret, p, en);
 		if(ch)
@@ -122,15 +122,18 @@ static char
 
 static int
 underlines(char **ret, char *st, char *en) {
-	if(st[0] != '\n' || st[1] == '\n')
+	if(!(st) || st[0] != '\n' || st[1] == '\n')
 		return 0;
 
 	char *p = st + 1;
-	for(; p < en && p[0] != '=' && p[0] != '-'; p++);
+	for(;p < en && p[0] != '\n'; p++);
 	if(p >= en)
 		return 0;
 
+	p++;
 	char c = p[0];
+	if(c != '=' && c != '-') 
+		return 0;
 	int l = p - (st + 1);
 
 	for(; p < en && p[0] == c; p++);
@@ -155,7 +158,7 @@ underlines(char **ret, char *st, char *en) {
 
 static int
 paragraphs(char **ret, char *st, char *en) {
-	if(st[0] != '\n' || st[1] == '\n')
+	if(!(st) || st[0] != '\n' || st[1] == '\n')
 		return 0;
 	
 	char *p = st + 1;
@@ -171,7 +174,7 @@ paragraphs(char **ret, char *st, char *en) {
 
 static int
 links(char **ret, char *st, char *en) {
-	if(st[0] != '<')
+	if(!(st) || st[0] != '<')
 		return 0;
 	
 	char *p = st + 1;
@@ -190,19 +193,14 @@ links(char **ret, char *st, char *en) {
 	for(size_t i = 0; i < LENGTH(fmts) && !img; i++)
 		img = strstr(buf, fmts[i]);
 	
-	if(h) {
-		*ret = apsprintf(*ret, "<a href=\"");
-		process(ret, h, &h[strlen(h)]);
-		*ret = apsprintf(*ret, "\">");
-	} else
-		*ret = apsprintf(*ret, "<a>");
-	if(img) 
-		*ret = apsprintf(*ret, "<img src=\"");
-	process(ret, buf, &buf[strlen(buf)]);
-	if(img)
-		*ret = apsprintf(*ret, "\"></a>");
+	if(h)
+		*ret = apsprintf(*ret, "<a href=\"%s\">", h);
 	else
-		*ret = apsprintf(*ret, "</a>");
+		*ret = apsprintf(*ret, "<a>");
+	if(img)
+		*ret = apsprintf(*ret, "<img src=\"%s\"></a>", buf);
+	else
+		*ret = apsprintf(*ret, "%s</a>", buf);
 
 	free(buf);
 	return (p - st) + 1;
@@ -210,6 +208,8 @@ links(char **ret, char *st, char *en) {
 
 static int
 replace(char **ret, char *st, char *en) {
+	if(!(st))
+		return 0;
 	switch(st[0]) {
 		case '&':
 			*ret = apsprintf(*ret, "&amp;");
@@ -225,6 +225,9 @@ replace(char **ret, char *st, char *en) {
 			return 1;
 		case '\'':
 			*ret = apsprintf(*ret, "&#39;");
+			return 1;
+		case '\n':
+			*ret = apsprintf(*ret, "<br>\n");
 			return 1;
 		default:
 			return 0;
