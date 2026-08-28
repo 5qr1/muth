@@ -7,34 +7,33 @@
 #include <string.h>
 
 #define LENGTH(x) sizeof(x)/sizeof(x[0])
+#define BUFSIZE 2048
 
-typedef int (*Parser)(char **, char *, char *);
+typedef int (*Parser)(char *, char *);
 static void eprint(int err, const char *fmt, ...);
 static void *emalloc(void *in, size_t n);
-static char *apsprintf(char *in, const char *fmt, ...);
-static char *filetobuf(FILE *in);
-static char *process(char **ret, char *st, char *en);
-static int underlines(char **ret, char *st, char *en);
-static int paragraphs(char **ret, char *st, char *en);
-static int links(char **ret, char *st, char *en);
-static int replace(char **ret, char *st, char *en);
+static char *lfiletobuf(FILE *in);
+static void process(char *st, char *en);
+static int underlines(char *st, char *en);
+static int paragraphs(char *st, char *en);
+static int links(char *st, char *en);
+static int replace(char *st, char *en);
 Parser parsers[] = {underlines, paragraphs, links, replace};
 char *fmts[] = {".jpg", ".jpeg", ".png", ".webp", ".gif"};
 
 int
 main(int argc, char **argv) {
-	FILE *s;
-	if(argc < 2)
-		eprint(0, "muth [file]\n");
+	FILE *s = stdin;
+	if(argc > 1) {
 	if(!(strcmp(argv[1], "-v")))
 		eprint(0, "muth v%s\n", VERSION);
 	if(!(s = fopen(argv[1], "r")))
 		eprint(EXIT_FAILURE, "bad file\n");
+	}
 	
-	char *buf = filetobuf(s), *html = emalloc(NULL, 1024);
-	html[0] = '\0';
+	char *buf = lfiletobuf(s);
+	process(buf, &buf[strlen(buf)]);
 
-	printf("%s", process(&html, buf, &buf[strlen(buf)]));
 	fclose(s);
 	free(buf);
 	exit(0);
@@ -67,64 +66,46 @@ static void
 }
 
 static char
-*apsprintf(char *in, const char *fmt, ...) {
-	va_list ap;
-
-	va_start(ap, fmt);
-	int l = vsnprintf(NULL, 0, fmt, ap), pl = strlen(in);
-	va_end(ap);
-
-	if(!l)
-		return in;
-	
-	in = emalloc(in, pl + l + 1);
-	va_start(ap, fmt);
-	vsnprintf(in + pl, l + 1, fmt, ap);
-	va_end(ap);
-
-	return in;
-}
-
-static char
-*filetobuf(FILE *in) {
+*lfiletobuf(FILE *in) {
 	if(!in)
-		return NULL;
+		return 0;
 
-	fseek(in, 0, SEEK_END);
-	long bufsiz = ftell(in);
-	char *buf = emalloc(NULL, bufsiz + 3);
-	fseek(in, 0, SEEK_SET);
-	
+	char *buf = emalloc(NULL, BUFSIZE);
 	buf[0] = '\n';
-	size_t len = fread(buf + 1, 1, bufsiz, in);
-	buf[len + 1] = '\0';
+
+	size_t s, len = 0, bsize = 2 * BUFSIZE;
+	while((s = fread(buf + len + 1, 1, BUFSIZE, in))) {
+		len += s;
+		if(BUFSIZE + len + 1 > bsize) {
+			bsize += BUFSIZE;
+			buf = emalloc(buf, bsize);
+		}
+	}
+	strcpy(buf + len + 1, "\n\0");
 	return buf;
 }
 
-static char
-*process(char **ret, char *st, char *en) {
+static void
+process(char *st, char *en) {
 	if(!(st) || !(en))
-		return 0;
-	if(!(*ret))
-		*ret = emalloc(NULL, 1024);
+		return;
 	
 	for(char *p = st; p < en; p++) {
 		int ch = 0;
 		for(size_t i = 0; i < LENGTH(parsers) && !ch; i++)
-			ch = parsers[i](ret, p, en);
+			ch = parsers[i](p, en);
 		if(ch)
 			p += ch - 1;
 		else
-			*ret = apsprintf(*ret, "%c", p[0]);
+			putc(p[0], stdout);
 	}
-	return *ret;
 }
 
 static int
-underlines(char **ret, char *st, char *en) {
-	if(!(st) || st[0] != '\n' || st[1] == '\n')
+underlines(char *st, char *en) {
+	if(!(st) || st[0] != '\n')
 		return 0;
-
+	
 	char *p = st + 1;
 	for(;p < en && p[0] != '\n'; p++);
 	if(p >= en)
@@ -144,20 +125,23 @@ underlines(char **ret, char *st, char *en) {
 		return 0;
 
 	if(c == '=') {
-		*ret = apsprintf(*ret, "<h1>");
-		process(ret, st + 1, st + l);
-		*ret = apsprintf(*ret, "</h1>\n");
-	} else {
-		*ret = apsprintf(*ret, "<h2>");
-		process(ret, st + 1, st + l);
-		*ret = apsprintf(*ret, "</h2>\n");
+		printf("<h1>");
+		process(st + 1, st + l);
+		printf("</h1>\n");
+	} else if(c == '-') {
+		printf("<h2>");
+		process(st + 1, st + l);
+		printf("</h2>\n");
 	}
-	
-	return (p - st) + 1;
+
+	if((en - p) > 2 && p[1] == '\n')
+		return (p - st) + 1;
+	else
+		return(p - st);
 }
 
 static int
-paragraphs(char **ret, char *st, char *en) {
+paragraphs(char *st, char *en) {
 	if(!(st) || st[0] != '\n' || st[1] == '\n')
 		return 0;
 	
@@ -166,14 +150,14 @@ paragraphs(char **ret, char *st, char *en) {
 	if(p[0] != '\n')
 		return 0;
 	
-	*ret = apsprintf(*ret, "<p>");
-	process(ret, st + 1, p);
-	*ret = apsprintf(*ret, "</p>\n");
+	printf("<p>");
+	process(st + 1, p);
+	printf("</p>\n");
 	return (p - st);
 }
 
 static int
-links(char **ret, char *st, char *en) {
+links(char *st, char *en) {
 	if(!(st) || st[0] != '<')
 		return 0;
 	
@@ -192,42 +176,46 @@ links(char **ret, char *st, char *en) {
 	char *img = 0;
 	for(size_t i = 0; i < LENGTH(fmts) && !img; i++)
 		img = strstr(buf, fmts[i]);
-	
-	if(h)
-		*ret = apsprintf(*ret, "<a href=\"%s\">", h);
-	else
-		*ret = apsprintf(*ret, "<a>");
-	if(img)
-		*ret = apsprintf(*ret, "<img src=\"%s\"></a>", buf);
-	else
-		*ret = apsprintf(*ret, "%s</a>", buf);
+
+	if(img) {
+		if(h)
+			printf("<a href=\"%s\"><img src=\"%s\"></a>", h, buf);
+		else
+			printf("<img src=\"%s\">", buf);
+	} else {
+		if(h)
+			printf("<a href=\"%s\">%s</a>", buf, h);
+		else	
+			printf("<a href=\"%s\">%s</a>", buf, buf);
+	}
 
 	free(buf);
 	return (p - st) + 1;
 }
 
 static int
-replace(char **ret, char *st, char *en) {
+replace(char *st, char *en) {
 	if(!(st))
 		return 0;
 	switch(st[0]) {
 		case '&':
-			*ret = apsprintf(*ret, "&amp;");
+			printf("&amp;");
 			return 1;
 		case '<':
-			*ret = apsprintf(*ret, "&lt;");
+			printf("&lt;");
 			return 1;
 		case '>':
-			*ret = apsprintf(*ret, "&gt;");
+			printf("&gt;");
 			return 1;
 		case '\"':
-			*ret = apsprintf(*ret, "&quot;");
+			printf("&quot;");
 			return 1;
 		case '\'':
-			*ret = apsprintf(*ret, "&#39;");
+			printf("&#39;");
 			return 1;
 		case '\n':
-			*ret = apsprintf(*ret, "<br>\n");
+			if((en - st) > 2 && st[1] == '\n')
+				printf("<br>\n");
 			return 1;
 		default:
 			return 0;
