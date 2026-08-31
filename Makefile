@@ -3,6 +3,7 @@
 
 VERSION = 0.4
 
+PREFIX = /usr/local
 CC = cc
 CFLAGS = -Wall -Wextra -DVERSION=\"$(VERSION)\"
 LDLIBS = -lm
