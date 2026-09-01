@@ -13,12 +13,14 @@ typedef int (*Parser)(char *, char *);
 static void eprint(int err, const char *fmt, ...);
 static void *emalloc(void *in, size_t n);
 static char *lfiletobuf(FILE *in);
-static void process(char *st, char *en);
+static void process(char *st, char *en, Parser parser);
+static int code(char *st, char *en);
 static int underlines(char *st, char *en);
 static int paragraphs(char *st, char *en);
+static int inlinecode(char *st, char *en);
 static int links(char *st, char *en);
 static int replace(char *st, char *en);
-Parser parsers[] = {underlines, paragraphs, links, replace};
+Parser parsers[] = {code, underlines, paragraphs, inlinecode, links, replace};
 char *fmts[] = {".jpg", ".jpeg", ".png", ".webp", ".gif"};
 
 int
@@ -32,7 +34,7 @@ main(int argc, char **argv) {
 	}
 	
 	char *buf = lfiletobuf(s);
-	process(buf, &buf[strlen(buf)]);
+	process(buf, &buf[strlen(buf)], 0);
 
 	fclose(s);
 	free(buf);
@@ -86,19 +88,38 @@ static char
 }
 
 static void
-process(char *st, char *en) {
+process(char *st, char *en, Parser parser) {
 	if(!(st) || !(en))
 		return;
 	
 	for(char *p = st; p < en; p++) {
 		int ch = 0;
-		for(size_t i = 0; i < LENGTH(parsers) && !ch; i++)
-			ch = parsers[i](p, en);
+		if(!parser)
+			for(size_t i = 0; i < LENGTH(parsers) && !ch; i++)
+				ch = parsers[i](p, en);
+		else
+			ch = parser(p, en);
 		if(ch)
 			p += ch - 1;
 		else
 			putc(p[0], stdout);
 	}
+}
+
+static int
+code(char *st, char *en) {
+	if(!(st) || st[0] != '\n' || st[1] != '`')
+		return 0;
+	
+	char *p = st + 2;
+	for(;p < en && p[0] != '`'; p++);
+	if(p >= en)
+		return 0;
+
+	printf("<pre><code>");
+	process(st + 2, p, replace);
+	printf("</code></pre>");
+	return (p - st) + 1;
 }
 
 static int
@@ -126,11 +147,11 @@ underlines(char *st, char *en) {
 
 	if(c == '=') {
 		printf("<h1>");
-		process(st + 1, st + l);
+		process(st + 1, st + l, 0);
 		printf("</h1>\n");
 	} else if(c == '-') {
 		printf("<h2>");
-		process(st + 1, st + l);
+		process(st + 1, st + l, 0);
 		printf("</h2>\n");
 	}
 
@@ -151,8 +172,24 @@ paragraphs(char *st, char *en) {
 		return 0;
 	
 	printf("<p>");
-	process(st + 1, p);
+	process(st + 1, p, 0);
 	printf("</p>\n");
+	return (p - st);
+}
+
+static int
+inlinecode(char *st, char *en) {
+	if(!(st) || st[0] != '`')
+		return 0;
+	
+	char *p = st + 1;
+	for(;p < en && p[0] != '`'; p++);
+	if(p >= en)
+		return 0;
+
+	printf("<code>");
+	process(st + 1, p, replace);
+	printf("</code>");
 	return (p - st);
 }
 
@@ -212,10 +249,6 @@ replace(char *st, char *en) {
 			return 1;
 		case '\'':
 			printf("&#39;");
-			return 1;
-		case '\n':
-			if((en - st) > 2 && st[1] == '\n')
-				printf("<br>\n");
 			return 1;
 		default:
 			return 0;

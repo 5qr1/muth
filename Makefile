@@ -1,7 +1,7 @@
 .POSIX:
 .PHONY: all install uninstall clean
 
-VERSION = 0.4
+VERSION = 0.5
 
 PREFIX = /usr/local
 CC = cc
