@@ -190,7 +190,7 @@ inlinecode(char *st, char *en) {
 	printf("<code>");
 	process(st + 1, p, replace);
 	printf("</code>");
-	return (p - st);
+	return (p - st) + 1;
 }
 
 static int
