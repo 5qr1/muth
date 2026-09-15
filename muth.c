@@ -16,11 +16,12 @@ static char *lfiletobuf(FILE *in);
 static void process(char *st, char *en, Parser parser);
 static int code(char *st, char *en);
 static int underlines(char *st, char *en);
+static int blockquotes(char *st, char *en);
 static int paragraphs(char *st, char *en);
 static int inlinecode(char *st, char *en);
 static int links(char *st, char *en);
 static int replace(char *st, char *en);
-Parser parsers[] = {code, underlines, paragraphs, inlinecode, links, replace};
+Parser parsers[] = {code, underlines, blockquotes, paragraphs, inlinecode, links, replace};
 char *fmts[] = {".jpg", ".jpeg", ".png", ".webp", ".gif"};
 
 int
@@ -159,6 +160,22 @@ underlines(char *st, char *en) {
 		return (p - st) + 1;
 	else
 		return(p - st);
+}
+
+static int
+blockquotes(char *st, char *en) {
+	if(!(st) || st[0] != '\n' || st[1] != '\t')
+		return 0;
+	
+	char *p = st + 1;
+	for(;p < en && p[0] != '\n'; p++);
+	if(p[0] != '\n')
+		return 0;
+	
+	printf("<blockquote>");
+	process(st + 1, p, 0);
+	printf("</blockquote>\n");
+	return (p - st);
 }
 
 static int
